@@ -6,7 +6,12 @@ SELECTED_POLICY = 'SHORTEST_QUEUE'
 NUM_SERVERS = 3
 # Average requests per second
 REQUEST_ARRIVAL_RATE = 10
-SIMULATION_TIME = 5000
+# Total simulation time
+SIMULATION_TIME = 200
+# This flag, if set to True, simulates a drastic increase of requests in a certain period,
+# along with a cooldown period and a constant flow phase
+# If set to False, simulates just a constant request flow given by the REQUEST_ARRIVAL_RATE
+SIMULATE_BURST_PHASE = True
 
 # Request types and their processing times
 PROCESSING_TIMES = {
@@ -119,21 +124,61 @@ class LoadBalancer:
             self.stats.record_completion(request)
 
 
-def request_generator(env, load_balancer, arrival_rate):
-    """Generates requests at random intervals."""
+def request_generator(env, load_balancer, simulate_burst_phase, request_arrival_rate):
+    """Generates requests using alternating traffic patterns."""
     request_id = 0
-    while True:
-        # Simulate requests arriving at random intervals
-        yield env.timeout(random.expovariate(1.0 / (1.0 / arrival_rate)))
 
-        # Vary request types
-        request_type = random.choice(list(PROCESSING_TIMES.keys()))
-        
-        req = Request(request_id, request_type, env.now)
-        print(f"[Time: {env.now:.4f}] Generator: New {req.type} Request {req.id} arrived.")
-        
-        load_balancer.handle_request(req)
-        request_id += 1
+    if simulate_burst_phase:
+        while env.now < SIMULATION_TIME:
+            # Constant flow phase - this phase simulates normal, steady traffic for a random duration
+            print(f"--- [Time: {env.now:.4f}] Starting CONSTANT FLOW phase ---")
+            flow_duration = random.uniform(10, SIMULATION_TIME)
+            phase_end_time = env.now + flow_duration
+            
+            while env.now < phase_end_time and env.now < SIMULATION_TIME:
+                # Generate requests based on the original arrival rate
+                yield env.timeout(random.expovariate(1.0 / (1.0 / request_arrival_rate)))
+                
+                request_type = random.choice(list(PROCESSING_TIMES.keys()))
+                req = Request(request_id, request_type, env.now)
+                print(f"[Time: {env.now:.4f}] Generator (Flow): New {req.type} Request {req.id} arrived.")
+                load_balancer.handle_request(req)
+                request_id += 1
+
+            if env.now >= SIMULATION_TIME:
+                break
+
+            # Burst phase - this phase simulates a sudden spike in traffic
+            print(f"--- [Time: {env.now:.4f}] Starting BURST phase ---")
+            num_burst_requests = random.randint(50, 100)
+            
+            for _ in range(num_burst_requests):
+                # In a burst, requests arrive very close to each other
+                yield env.timeout(random.uniform(0.01, 0.05))
+
+                request_type = random.choice(list(PROCESSING_TIMES.keys()))
+                req = Request(request_id, request_type, env.now)
+                print(f"[Time: {env.now:.4f}] Generator (Burst): New {req.type} Request {req.id} arrived.")
+                load_balancer.handle_request(req)
+                request_id += 1
+
+            # Cooldown period - a brief pause after a burst before returning to normal flow
+            print(f"--- [Time: {env.now:.4f}] Starting COOLDOWN phase ---")
+            yield env.timeout(random.uniform(10, 20))
+
+    else:
+        while True:
+            # Simulate requests arriving at random intervals
+            yield env.timeout(random.expovariate(1.0 / (1.0 / request_arrival_rate)))
+
+            # Vary request types
+            request_type = random.choice(list(PROCESSING_TIMES.keys()))
+            
+            req = Request(request_id, request_type, env.now)
+            print(f"[Time: {env.now:.4f}] Generator: New {req.type} Request {req.id} arrived.")
+            
+            load_balancer.handle_request(req)
+            request_id += 1
 
 def run_simulation():
     """Sets up and runs the simulation."""
@@ -152,7 +197,7 @@ def run_simulation():
     load_balancer = LoadBalancer(env, servers, stats, policy=SELECTED_POLICY)
     
     # Start the request generator process
-    env.process(request_generator(env, load_balancer, REQUEST_ARRIVAL_RATE))
+    env.process(request_generator(env, load_balancer, SIMULATE_BURST_PHASE, REQUEST_ARRIVAL_RATE))
     
     # Run the simulation for a fixed amount of time
     env.run(until=SIMULATION_TIME)
