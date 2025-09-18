@@ -7,7 +7,7 @@ NUM_SERVERS = 3
 # Average requests per second
 REQUEST_ARRIVAL_RATE = 10
 # Total simulation time
-SIMULATION_TIME = 200
+SIMULATION_TIME = 150
 # This flag, if set to True, simulates a drastic increase of requests in a certain period,
 # along with a cooldown period and a constant flow phase
 # If set to False, simulates just a constant request flow given by the REQUEST_ARRIVAL_RATE
@@ -19,6 +19,18 @@ PROCESSING_TIMES = {
     'CPU_INTENSIVE': (0.1, 0.3),
     'IO_BOUND': (0.4, 0.8)
 }
+
+class Colors:
+    """A class to hold ANSI color codes for terminal output."""
+    RESET = '\033[0m'
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    MAGENTA = '\033[95m'
+    CYAN = '\033[96m'
+    BOLD = '\033[1m'
+
 
 class Statistics:
     """A simple class to collect simulation metrics."""
@@ -73,8 +85,8 @@ class Server:
         yield self.env.timeout(processing_time)
         
         request.completion_time = self.env.now
-        print(f"[Time: {self.env.now:.4f}] Server {self.id}: Finished Request {request.id}. "
-                f"Response Time: {request.completion_time - request.arrival_time:.4f}")
+        print(f"{Colors.MAGENTA}[Time: {self.env.now:.4f}] Server {self.id}: Finished Request {request.id}. "
+              f"Response Time: {request.completion_time - request.arrival_time:.4f}{Colors.RESET}")
 
 class LoadBalancer:
     """Distributes incoming requests to a set of servers based on a policy."""
@@ -104,8 +116,8 @@ class LoadBalancer:
         # Send the request to the selected server
         selected_server.queue_len += 1
         request.start_time = self.env.now
-        print(f"[Time: {self.env.now:.4f}] Load Balancer: Sent Request {request.id} to Server {selected_server.id}. "
-                f"Queue length: {selected_server.queue_len}")
+        print(f"{Colors.BLUE}[Time: {self.env.now:.4f}] Load Balancer: Sent Request {request.id} to Server {selected_server.id}. "
+              f"Queue length: {selected_server.queue_len}{Colors.RESET}")
 
         # Start the processing process on the server
         self.env.process(self.server_worker(selected_server, request))
@@ -131,7 +143,7 @@ def request_generator(env, load_balancer, simulate_burst_phase, request_arrival_
     if simulate_burst_phase:
         while env.now < SIMULATION_TIME:
             # Constant flow phase - this phase simulates normal, steady traffic for a random duration
-            print(f"--- [Time: {env.now:.4f}] Starting CONSTANT FLOW phase ---")
+            print(f"{Colors.BOLD}{Colors.GREEN}--- [Time: {env.now:.4f}] Starting CONSTANT FLOW phase ---{Colors.RESET}")
             flow_duration = random.uniform(10, SIMULATION_TIME)
             phase_end_time = env.now + flow_duration
             
@@ -141,7 +153,7 @@ def request_generator(env, load_balancer, simulate_burst_phase, request_arrival_
                 
                 request_type = random.choice(list(PROCESSING_TIMES.keys()))
                 req = Request(request_id, request_type, env.now)
-                print(f"[Time: {env.now:.4f}] Generator (Flow): New {req.type} Request {req.id} arrived.")
+                print(f"{Colors.GREEN}[Time: {env.now:.4f}] Generator (Flow): New {req.type} Request {req.id} arrived.{Colors.RESET}")
                 load_balancer.handle_request(req)
                 request_id += 1
 
@@ -149,7 +161,7 @@ def request_generator(env, load_balancer, simulate_burst_phase, request_arrival_
                 break
 
             # Burst phase - this phase simulates a sudden spike in traffic
-            print(f"--- [Time: {env.now:.4f}] Starting BURST phase ---")
+            print(f"{Colors.BOLD}{Colors.RED}--- [Time: {env.now:.4f}] Starting BURST phase ---{Colors.RESET}")
             num_burst_requests = random.randint(50, 100)
             
             for _ in range(num_burst_requests):
@@ -158,12 +170,12 @@ def request_generator(env, load_balancer, simulate_burst_phase, request_arrival_
 
                 request_type = random.choice(list(PROCESSING_TIMES.keys()))
                 req = Request(request_id, request_type, env.now)
-                print(f"[Time: {env.now:.4f}] Generator (Burst): New {req.type} Request {req.id} arrived.")
+                print(f"{Colors.RED}[Time: {env.now:.4f}] Generator (Burst): New {req.type} Request {req.id} arrived.{Colors.RESET}")
                 load_balancer.handle_request(req)
                 request_id += 1
 
             # Cooldown period - a brief pause after a burst before returning to normal flow
-            print(f"--- [Time: {env.now:.4f}] Starting COOLDOWN phase ---")
+            print(f"{Colors.BOLD}{Colors.YELLOW}--- [Time: {env.now:.4f}] Starting COOLDOWN phase ---{Colors.RESET}")
             yield env.timeout(random.uniform(10, 20))
 
     else:
@@ -175,14 +187,14 @@ def request_generator(env, load_balancer, simulate_burst_phase, request_arrival_
             request_type = random.choice(list(PROCESSING_TIMES.keys()))
             
             req = Request(request_id, request_type, env.now)
-            print(f"[Time: {env.now:.4f}] Generator: New {req.type} Request {req.id} arrived.")
+            print(f"{Colors.CYAN}[Time: {env.now:.4f}] Generator: New {req.type} Request {req.id} arrived.{Colors.RESET}")
             
             load_balancer.handle_request(req)
             request_id += 1
 
 def run_simulation():
     """Sets up and runs the simulation."""
-    print(f"--- Starting Simulation with {SELECTED_POLICY} policy ---")
+    print(f"{Colors.BOLD}--- Starting Simulation with {SELECTED_POLICY} policy ---{Colors.RESET}\n")
     
     # Create the stats collector
     stats = Statistics()
@@ -202,16 +214,16 @@ def run_simulation():
     # Run the simulation for a fixed amount of time
     env.run(until=SIMULATION_TIME)
     
-    print("--- Simulation Finished ---")
+    print(f"\n{Colors.BOLD}--- Simulation Finished ---{Colors.RESET}")
 
     throughput = stats.calculate_throughput(SIMULATION_TIME)
     avg_response_time = stats.calculate_avg_response_time()
     
-    print(f"\n--- Results for {SELECTED_POLICY} ---")
-    print(f"Total simulation time: {SIMULATION_TIME} seconds")
-    print(f"Total requests completed: {stats.completed_requests}")
-    print(f"Throughput: {throughput:.4f} requests/sec")
-    print(f"Average response time: {avg_response_time:.4f} seconds")
+    print(f"\n{Colors.BOLD}{Colors.GREEN}--- Results for {SELECTED_POLICY} ---{Colors.RESET}")
+    print(f"{Colors.BOLD}Total simulation time: {SIMULATION_TIME} seconds{Colors.RESET}")
+    print(f"{Colors.BOLD}Total requests completed: {stats.completed_requests}{Colors.RESET}")
+    print(f"{Colors.BOLD}Throughput: {throughput:.4f} requests/sec{Colors.RESET}")
+    print(f"{Colors.BOLD}Average response time: {avg_response_time:.4f} seconds{Colors.RESET}")
 
 if __name__ == "__main__":
     run_simulation()
