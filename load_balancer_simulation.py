@@ -75,6 +75,7 @@ class Server:
         """Simulates the processing of a single request."""
         min_proc, max_proc = PROCESSING_TIMES[request.type]
         processing_time = random.uniform(min_proc, max_proc)
+        # Simulate the processing time
         yield self.env.timeout(processing_time)
         request.completion_time = self.env.now
         if self.show_logs:
@@ -113,8 +114,10 @@ class LoadBalancer:
     def server_worker(self, server, request):
         """A generator that represents the request's lifecycle at the server."""
         with server.processor.request() as req:
+            # Waiting for any other previous process to end
             yield req
             server.queue_len -= 1
+            # Sending the process to the server
             yield self.env.process(server.process_request(request))
             self.stats.record_completion(request)
 
