@@ -8,7 +8,7 @@ POLICIES = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE']
 ARRIVAL_RATES = np.arange(2, 22, 2)
 # Increased time for more stable results across different rates
 SIM_TIME_PER_RUN = 200 
-NUM_SERVERS_FOR_PLOT = 10
+NUM_SERVERS_FOR_PLOT = 3
 SIMULATE_BURST_PHASE_FOR_PLOT = True
 OUTPUT_DIR = 'stats'
 

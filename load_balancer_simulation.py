@@ -10,8 +10,8 @@ SIMULATION_TIME = 100
 SIMULATE_BURST_PHASE = True 
 
 PROCESSING_TIMES = {
-    'CPU_INTENSIVE': (1, 15),
-    'IO_BOUND': (15, 30)
+    'CPU_INTENSIVE': (1, 8),
+    'IO_BOUND': (8, 15)
 }
 
 class Colors:
