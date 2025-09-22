@@ -20,7 +20,6 @@ POLICIES_TO_TEST = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE'] # Políticas que 
 NUM_SERVERS = 3                      # Quantidade de servidores disponíveis.
 REQUEST_ARRIVAL_RATE = 10            # Média de requests chegando por segundo.
 SIMULATION_TIME = 100                # Duração total da simulação em segundos.
-SIMULATE_BURST_PHASE = True          # (Não usado) Flag pra modelar picos de tráfego no futuro.
 
 # Tempo de processamento (min, max) pra cada tipo de request.
 PROCESSING_TIMES = {
@@ -34,6 +33,8 @@ class Colors:
     GREEN = '\033[92m'
     CYAN = '\033[96m'
     BOLD = '\033[1m'
+    MAGENTA = '\033[95m'
+    BLUE = '\033[94m'
 
 class Statistics:
     """Classe que guarda e calcula as métricas da simulação."""
@@ -77,7 +78,7 @@ class Request:
 
 class Server:
     """Representa um servidor que processa uma request por vez."""
-    def __init__(self, env, server_id):
+    def __init__(self, env, server_id, show_logs=True):
         """
         Inicia um Servidor.
         - env: Ambiente do SimPy.
@@ -87,16 +88,20 @@ class Server:
         self.id = server_id
         self.processor = simpy.Resource(env, capacity=1)
         self.queue_len = 0 # Tamanho da fila (contando a request em processamento).
+        self.show_logs = show_logs
 
     def process_request(self, request):
         """Simula o tempo que leva pra processar a request."""
         # Pausa a execução pelo tempo de processamento da request.
         yield self.env.timeout(request.processing_time)
         request.completion_time = self.env.now
+        if self.show_logs:
+            print(f"{Colors.MAGENTA}[Time: {self.env.now:.4f}] Server {self.id}: Request {request.id} finalizado. "
+                  f"Response Time: {request.completion_time - request.arrival_time:.4f}{Colors.RESET}")
 
 class LoadBalancer:
     """Distribui as requests que chegam para os servidores."""
-    def __init__(self, env, servers, stats, policy='ROUND_ROBIN'):
+    def __init__(self, env, servers, stats, policy='ROUND_ROBIN', show_logs=True):
         """
         Inicia o LoadBalancer.
         - env: Ambiente do SimPy.
@@ -109,6 +114,7 @@ class LoadBalancer:
         self.stats = stats
         self.policy = policy
         self.rr_counter = 0 # Contador pro Round Robin.
+        self.show_logs = show_logs
 
     def handle_request(self, request):
         """Escolhe um servidor com base na política e manda a request pra ele."""
@@ -125,6 +131,10 @@ class LoadBalancer:
 
         # Aumenta o contador da fila e inicia o processo do servidor.
         selected_server.queue_len += 1
+        if self.show_logs:
+            print(f"{Colors.BLUE}[Time: {self.env.now:.4f}] Load Balancer: Request {request.id} enviado para o Server {selected_server.id}. "
+                  f"Tamanho da fila: {selected_server.queue_len}{Colors.RESET}")
+
         self.env.process(self.server_worker(selected_server, request))
 
     def server_worker(self, server, request):
@@ -142,7 +152,7 @@ class LoadBalancer:
             # Grava as estatísticas quando termina.
             self.stats.record_completion(request)
 
-def pre_generate_requests(sim_time, simulate_burst_phase, request_arrival_rate):
+def pre_generate_requests(sim_time, request_arrival_rate):
     """
     Cria a lista de requests ANTES da simulação começar.
     Isso garante que todas as políticas usem a mesma lista, pra comparação ser justa.
@@ -168,7 +178,7 @@ def pre_generate_requests(sim_time, simulate_burst_phase, request_arrival_rate):
             })
     return requests
 
-def request_injector(env, load_balancer, pre_generated_requests):
+def request_injector(env, load_balancer, pre_generated_requests, show_logs=True):
     """
     Processo do SimPy que vai 'injetando' as requests da lista na simulação.
     Ele lê a lista e espera o tempo certo pra criar e enviar a request pro LB.
@@ -184,25 +194,26 @@ def request_injector(env, load_balancer, pre_generated_requests):
             arrival_time=env.now,
             processing_time=req_info['processing_time']
         )
+        if show_logs: print(f"{Colors.CYAN}[Time: {env.now:.4f}] Generator: Novo request {req.type} com ID {req.id} foi gerado.{Colors.RESET}")
         # Entrega a request pro load balancer.
         load_balancer.handle_request(req)
 
-def run_single_simulation(policy, num_servers, sim_time, pre_generated_requests, show_logs=False):
+def run_single_simulation(policy, num_servers, sim_time, pre_generated_requests, show_logs=True):
     """
     Configura e roda a simulação completa pra UMA política específica.
     Retorna o tempo médio de resposta e o throughput.
     """
     if show_logs:
-        print(f"{Colors.CYAN}--- Rodando simulação para a política '{policy}' ---{Colors.RESET}")
+        print(f"{Colors.BOLD}--- Rodando simulação para a política '{policy}' ---{Colors.RESET}")
     
     # Prepara o ambiente da simulação.
     stats = Statistics()
     env = simpy.Environment()
-    servers = [Server(env, i) for i in range(num_servers)]
-    load_balancer = LoadBalancer(env, servers, stats, policy=policy)
+    servers = [Server(env, i, show_logs=show_logs) for i in range(num_servers)]
+    load_balancer = LoadBalancer(env, servers, stats, policy=policy, show_logs=show_logs)
     
     # Inicia o processo que injeta as requests.
-    env.process(request_injector(env, load_balancer, pre_generated_requests))
+    env.process(request_injector(env, load_balancer, pre_generated_requests, show_logs=show_logs))
     
     # Roda a simulação.
     env.run(until=sim_time) 
@@ -222,7 +233,7 @@ if __name__ == "__main__":
     random.seed(42) 
     
     print("Gerando lista de requests para a simulação...")
-    master_request_list = pre_generate_requests(SIMULATION_TIME, SIMULATE_BURST_PHASE, REQUEST_ARRIVAL_RATE)
+    master_request_list = pre_generate_requests(SIMULATION_TIME, REQUEST_ARRIVAL_RATE)
     print(f"{len(master_request_list)} requests geradas.")
 
     all_results = []
