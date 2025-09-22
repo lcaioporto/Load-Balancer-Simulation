@@ -11,7 +11,7 @@ SIMULATE_BURST_PHASE = True
 
 PROCESSING_TIMES = {
     'CPU_INTENSIVE': (1, 15),
-    'IO_BOUND': (1, 15)
+    'IO_BOUND': (15, 30)
 }
 
 class Colors:
