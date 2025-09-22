@@ -6,16 +6,14 @@ import random
 
 POLICIES = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE']
 ARRIVAL_RATES = np.arange(2, 22, 2)
-# Increased time for more stable results across different rates
-SIM_TIME_PER_RUN = 200 
+SIM_TIME_PER_RUN = 200
 NUM_SERVERS_FOR_PLOT = 3
 SIMULATE_BURST_PHASE_FOR_PLOT = True
 OUTPUT_DIR = 'stats'
 
 def run_experiment():
     """
-    Runs simulations for each policy across all arrival rates, ensuring
-    fair comparison at each rate.
+    Executa simulações para cada política em todas as taxas de chegada
     """
     results = {p: {'avg_response_times': [], 'throughputs': []} for p in POLICIES}
 
@@ -46,7 +44,7 @@ def run_experiment():
 
 def plot_and_save_results(results):
     """
-    Generates and saves plots, now including the area-under-the-curve metrics.
+    Gera e salva gráficos, incluindo as métricas de área sob a curva.
     """
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
@@ -57,15 +55,14 @@ def plot_and_save_results(results):
     # --- Plot 1: Average Response Time ---
     fig1, ax1 = plt.subplots(figsize=(12, 7))
 
-    # BUG FIX: Restored area calculation logic
-    # For response time, a smaller area is better.
+    # Para tempo de resposta, uma área menor é melhor.
     areas = {p: np.trapezoid(results[p]['avg_response_times'], ARRIVAL_RATES) for p in POLICIES}
-    # Find the policy with the minimum area (best performance)
+    # Encontre a política com a área mínima (melhor desempenho)
     min_area = min(areas.values())
 
     for policy in POLICIES:
         area = areas[policy]
-        # Performance relative to the best policy (lower is better)
+        # Desempenho em relação à melhor política (quanto menor, melhor)
         rel_perf = area / min_area if min_area > 0 else 0
         label_text = f'{policy} (Best Perf. Ratio: {rel_perf:.2f})'
         ax1.plot(ARRIVAL_RATES, results[policy]['avg_response_times'], marker='o', linestyle='-', label=label_text)
@@ -83,15 +80,14 @@ def plot_and_save_results(results):
     # --- Plot 2: Throughput ---
     fig2, ax2 = plt.subplots(figsize=(12, 7))
     
-    # BUG FIX: Restored area calculation logic
-    # For throughput, a larger area is better.
+    # Para throughput, uma área maior é melhor
     areas = {p: np.trapezoid(results[p]['throughputs'], ARRIVAL_RATES) for p in POLICIES}
-    # Find the policy with the maximum area (best performance)
+    # Encontre a política com a área máxima (melhor desempenho)
     max_area = max(areas.values())
 
     for policy in POLICIES:
         area = areas[policy]
-        # Performance relative to the best policy (higher is better)
+        # Desempenho em relação à melhor política (quanto maior, melhor)
         rel_perf = area / max_area if max_area > 0 else 0
         label_text = f'{policy} (Best Perf. Ratio: {rel_perf:.2f})'
         ax2.plot(ARRIVAL_RATES, results[policy]['throughputs'], marker='s', linestyle='--', label=label_text)
