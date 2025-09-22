@@ -2,40 +2,40 @@ import numpy as np
 import matplotlib.pyplot as plt
 import load_balancer_simulation as lbs
 import os
+import random
 
 POLICIES = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE']
-# Define the range of request arrival rates to test
 ARRIVAL_RATES = np.arange(2, 22, 2)
-# Simulation time for each individual run
-SIM_TIME_PER_RUN = 2000
-NUM_SERVERS_FOR_PLOT = 3
-# Set to False to compare policies under constant flow
-SIMULATE_BURST_PHASE_FOR_PLOT = False
-# Output directory
+# Increased time for more stable results across different rates
+SIM_TIME_PER_RUN = 200 
+NUM_SERVERS_FOR_PLOT = 10
+SIMULATE_BURST_PHASE_FOR_PLOT = True
 OUTPUT_DIR = 'stats'
-
 
 def run_experiment():
     """
-    Runs the simulation for each policy across all specified arrival rates
-    and collects the results.
+    Runs simulations for each policy across all arrival rates, ensuring
+    fair comparison at each rate.
     """
-    results = {policy: {'avg_response_times': [], 'throughputs': []} for policy in POLICIES}
+    results = {p: {'avg_response_times': [], 'throughputs': []} for p in POLICIES}
 
     print("--- Starting Experiment ---")
-    print(f"Testing Policies: {POLICIES}")
-    print(f"Testing Arrival Rates: {ARRIVAL_RATES}\n")
-
-    for policy in POLICIES:
-        print(f"--- Running simulations for '{policy}' policy ---")
-        for rate in ARRIVAL_RATES:
-            print(f"  Testing arrival rate: {rate} req/s")
-            avg_time, throughput = lbs.run_simulation(
+    for rate in ARRIVAL_RATES:
+        print(f"\n--- Testing Arrival Rate: {rate} req/s ---")
+        random.seed(34)
+        request_list_for_rate = lbs.pre_generate_requests(
+            sim_time=SIM_TIME_PER_RUN,
+            simulate_burst_phase=SIMULATE_BURST_PHASE_FOR_PLOT,
+            request_arrival_rate=rate
+        )
+        
+        for policy in POLICIES:
+            print(f"  Running policy: '{policy}'...")
+            avg_time, throughput = lbs.run_single_simulation(
                 policy=policy,
-                arrival_rate=rate,
-                sim_time=SIM_TIME_PER_RUN,
                 num_servers=NUM_SERVERS_FOR_PLOT,
-                burst_phase=SIMULATE_BURST_PHASE_FOR_PLOT,
+                sim_time=SIM_TIME_PER_RUN,
+                pre_generated_requests=request_list_for_rate,
                 show_logs=False
             )
             results[policy]['avg_response_times'].append(avg_time)
@@ -46,9 +46,7 @@ def run_experiment():
 
 def plot_and_save_results(results):
     """
-    Generates, saves, and calculates the area under the curve for two plots:
-    1. Average Response Time vs. Arrival Rate
-    2. Throughput vs. Arrival Rate
+    Generates and saves plots, now including the area-under-the-curve metrics.
     """
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
@@ -56,55 +54,57 @@ def plot_and_save_results(results):
 
     plt.style.use('seaborn-v0_8-whitegrid')
     
-    # Graphic 1: Average Response Time vs. Arrival Rate
+    # --- Plot 1: Average Response Time ---
     fig1, ax1 = plt.subplots(figsize=(12, 7))
 
-    # Include relative areas
-    areas = [np.trapezoid(results[policy]['avg_response_times'], ARRIVAL_RATES) for policy in POLICIES]
-    max_area = max(areas)
-    for idx, policy in enumerate(POLICIES):
-        area = areas[idx]
-        rel = max_area / area if area != 0 else 0
-        label_text = f'{policy} (Relative Area: {rel:.4f})'
+    # BUG FIX: Restored area calculation logic
+    # For response time, a smaller area is better.
+    areas = {p: np.trapezoid(results[p]['avg_response_times'], ARRIVAL_RATES) for p in POLICIES}
+    # Find the policy with the minimum area (best performance)
+    min_area = min(areas.values())
+
+    for policy in POLICIES:
+        area = areas[policy]
+        # Performance relative to the best policy (lower is better)
+        rel_perf = area / min_area if min_area > 0 else 0
+        label_text = f'{policy} (Best Perf. Ratio: {rel_perf:.2f})'
         ax1.plot(ARRIVAL_RATES, results[policy]['avg_response_times'], marker='o', linestyle='-', label=label_text)
     
-    ax1.set_title('Load Balancer Performance: Average Response Time', fontsize=16, pad=20)
+    ax1.set_title('Load Balancer: Average Response Time vs. Arrival Rate', fontsize=16)
     ax1.set_xlabel('Request Arrival Rate (requests/sec)', fontsize=12)
     ax1.set_ylabel('Average Response Time (seconds)', fontsize=12)
-    legend = ax1.legend(title='Policy', fontsize=10)
-    plt.setp(legend.get_title(), fontsize='11')
+    ax1.legend(title='Policy')
     ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
-
-    # Save Fig 1
     fig1_path = os.path.join(OUTPUT_DIR, 'average_response_time.png')
-    fig1.savefig(fig1_path, bbox_inches='tight', dpi=150)
+    fig1.savefig(fig1_path, dpi=150)
     plt.close(fig1)
-    print(f"Plot saved successfully to: {fig1_path}")
+    print(f"Plot saved to: {fig1_path}")
 
-    # Graphic 2: Throughput vs. Arrival Rate
+    # --- Plot 2: Throughput ---
     fig2, ax2 = plt.subplots(figsize=(12, 7))
     
-    # Include relative areas
-    areas = [np.trapezoid(results[policy]['throughputs'], ARRIVAL_RATES) for policy in POLICIES]
-    max_area = max(areas)
-    for idx, policy in enumerate(POLICIES):
-        area = areas[idx]
-        rel = area / max_area if max_area != 0 else 0
-        label_text = f'{policy} (Relative Area: {rel:.4f})'
+    # BUG FIX: Restored area calculation logic
+    # For throughput, a larger area is better.
+    areas = {p: np.trapezoid(results[p]['throughputs'], ARRIVAL_RATES) for p in POLICIES}
+    # Find the policy with the maximum area (best performance)
+    max_area = max(areas.values())
+
+    for policy in POLICIES:
+        area = areas[policy]
+        # Performance relative to the best policy (higher is better)
+        rel_perf = area / max_area if max_area > 0 else 0
+        label_text = f'{policy} (Best Perf. Ratio: {rel_perf:.2f})'
         ax2.plot(ARRIVAL_RATES, results[policy]['throughputs'], marker='s', linestyle='--', label=label_text)
 
-    ax2.set_title('Load Balancer Performance: Throughput', fontsize=16, pad=20)
+    ax2.set_title('Load Balancer: Throughput vs. Arrival Rate', fontsize=16)
     ax2.set_xlabel('Request Arrival Rate (requests/sec)', fontsize=12)
     ax2.set_ylabel('Throughput (completed requests/sec)', fontsize=12)
-    legend = ax2.legend(title='Policy', fontsize=10)
-    plt.setp(legend.get_title(), fontsize='11')
+    ax2.legend(title='Policy')
     ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
-    
-    # Save Fig 2
     fig2_path = os.path.join(OUTPUT_DIR, 'throughput.png')
-    fig2.savefig(fig2_path, bbox_inches='tight', dpi=150)
+    fig2.savefig(fig2_path, dpi=150)
     plt.close(fig2)
-    print(f"Plot saved successfully to: {fig2_path}")
+    print(f"Plot saved to: {fig2_path}")
 
 if __name__ == "__main__":
     experiment_results = run_experiment()
