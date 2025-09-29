@@ -8,7 +8,6 @@ POLICIES = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE']
 ARRIVAL_RATES = np.arange(2, 22, 2)
 SIM_TIME_PER_RUN = 200
 NUM_SERVERS_FOR_PLOT = 3
-SIMULATE_BURST_PHASE_FOR_PLOT = True
 OUTPUT_DIR = 'stats'
 
 def run_experiment():
@@ -23,7 +22,6 @@ def run_experiment():
         random.seed(34)
         request_list_for_rate = lbs.pre_generate_requests(
             sim_time=SIM_TIME_PER_RUN,
-            simulate_burst_phase=SIMULATE_BURST_PHASE_FOR_PLOT,
             request_arrival_rate=rate
         )
         
