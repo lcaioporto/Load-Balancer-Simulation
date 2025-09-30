@@ -5,7 +5,7 @@ import os
 import random
 
 POLICIES = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE']
-ARRIVAL_RATES = np.arange(2, 22, 2)
+ARRIVAL_RATES = np.arange(0.5, 22, 0.5)
 SIM_TIME_PER_RUN = 200
 NUM_SERVERS_FOR_PLOT = 3
 OUTPUT_DIR = 'stats'
@@ -27,6 +27,7 @@ def run_experiment():
         
         for policy in POLICIES:
             print(f"  Running policy: '{policy}'...")
+            random.seed(34)
             avg_time, throughput = lbs.run_single_simulation(
                 policy=policy,
                 num_servers=NUM_SERVERS_FOR_PLOT,
