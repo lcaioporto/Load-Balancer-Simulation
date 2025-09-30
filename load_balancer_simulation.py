@@ -125,7 +125,10 @@ class LoadBalancer:
             selected_server = self.servers[self.rr_counter]
             self.rr_counter = (self.rr_counter + 1) % len(self.servers)
         elif self.policy == 'SHORTEST_QUEUE':
-            selected_server = min(self.servers, key=lambda s: s.queue_len)
+            loads = [s.queue_len for s in self.servers]
+            min_load = min(loads)
+            candidates = [s for s, l in zip(self.servers, loads) if l == min_load]
+            selected_server = random.choice(candidates)
         else:
             raise ValueError(f"Política desconhecida: {self.policy}")
 
@@ -145,12 +148,17 @@ class LoadBalancer:
         with server.processor.request() as req:
             # Espera o servidor ficar disponível.
             yield req
-            # Quando começa a processar, o item "sai da fila de espera".
-            server.queue_len -= 1
-            # Inicia o processamento de fato.
-            yield self.env.process(server.process_request(request))
-            # Grava as estatísticas quando termina.
-            self.stats.record_completion(request)
+            try:
+                # Executa o processo
+                yield self.env.process(server.process_request(request))
+                self.stats.record_completion(request)
+            finally:
+                # Somente remove da fila quando o processo termina de ser executado
+                # Assim, queue_len >= 1 implica em servidor ocupado
+                server.queue_len -= 1
+                # sanity
+                if server.queue_len < 0:
+                    server.queue_len = 0
 
 def pre_generate_requests(sim_time, request_arrival_rate):
     """
