@@ -66,7 +66,7 @@ def plot_and_save_results(results):
         label_text = f'{policy} (Best Perf. Ratio: {rel_perf:.2f})'
         ax1.plot(ARRIVAL_RATES, results[policy]['avg_response_times'], marker='o', linestyle='-', label=label_text)
     
-    ax1.set_title('Load Balancer: Average Response Time vs. Arrival Rate', fontsize=16)
+    ax1.set_title(f'Load Balancer: Average Response Time vs. Arrival Rate (N = {NUM_SERVERS_FOR_PLOT})', fontsize=16)
     ax1.set_xlabel('Request Arrival Rate (requests/sec)', fontsize=12)
     ax1.set_ylabel('Average Response Time (seconds)', fontsize=12)
     ax1.legend(title='Policy')
@@ -91,7 +91,7 @@ def plot_and_save_results(results):
         label_text = f'{policy} (Best Perf. Ratio: {rel_perf:.2f})'
         ax2.plot(ARRIVAL_RATES, results[policy]['throughputs'], marker='s', linestyle='--', label=label_text)
 
-    ax2.set_title('Load Balancer: Throughput vs. Arrival Rate', fontsize=16)
+    ax2.set_title(f'Load Balancer: Throughput vs. Arrival Rate (N = {NUM_SERVERS_FOR_PLOT})', fontsize=16)
     ax2.set_xlabel('Request Arrival Rate (requests/sec)', fontsize=12)
     ax2.set_ylabel('Throughput (completed requests/sec)', fontsize=12)
     ax2.legend(title='Policy')
