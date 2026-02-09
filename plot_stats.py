@@ -22,7 +22,7 @@ NUM_SERVERS_FOR_PLOT = args.nservers
 POLICIES = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE']
 ARRIVAL_RATES = np.arange(0.5, 22, 0.5)
 SIM_TIME_PER_RUN = 200
-OUTPUT_DIR = 'stats'
+OUTPUT_DIR = f'stats/{NUM_SERVERS_FOR_PLOT}_servers'
 
 def run_experiment():
     """
