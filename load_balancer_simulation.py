@@ -15,9 +15,24 @@ import simpy
 import random
 import pandas as pd
 
+import argparse
+
+parser = argparse.ArgumentParser(description='Run Load Balancer Simulation.')
+
+# Add the argument for number of servers
+parser.add_argument(
+    '--nservers', 
+    type=int, 
+    required=True, 
+    help='Number of servers available in the simulation (e.g., --nservers 30)'
+)
+
+# Parse arguments
+args = parser.parse_args()
+NUM_SERVERS = args.nservers
+
 # Simulation Settings
 POLICIES_TO_TEST = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE'] # Policies to be tested
-NUM_SERVERS = 3                                                # Number of available servers
 REQUEST_ARRIVAL_RATE = 10                                      # Average number of requests arriving per second
 SIMULATION_TIME = 100                                          # Total simulation duration in seconds
 

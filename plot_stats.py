@@ -3,11 +3,25 @@ import matplotlib.pyplot as plt
 import load_balancer_simulation as lbs
 import os
 import random
+import argparse
+
+parser = argparse.ArgumentParser(description='Run Load Balancer Simulation.')
+
+# Add the argument for number of servers
+parser.add_argument(
+    '--nservers', 
+    type=int, 
+    required=True, 
+    help='Number of servers available in the simulation (e.g., --nservers 30)'
+)
+
+# Parse arguments
+args = parser.parse_args()
+NUM_SERVERS_FOR_PLOT = args.nservers
 
 POLICIES = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE']
 ARRIVAL_RATES = np.arange(0.5, 22, 0.5)
 SIM_TIME_PER_RUN = 200
-NUM_SERVERS_FOR_PLOT = 3
 OUTPUT_DIR = 'stats'
 
 def run_experiment():
