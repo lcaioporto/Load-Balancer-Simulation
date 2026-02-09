@@ -1,34 +1,34 @@
 """
-Script que usa SimPy pra simular e comparar umas políticas de load balancing.
+Script that uses SimPy to simulate and compare three load balancing policies.
 
-A ideia é gerar uma lista de requests antes pra todo mundo usar a mesma,
-aí a comparação fica justa.
+The idea is to generate a list of requests beforehand so every simulation uses the same one,
+making the comparison fair.
 
-Políticas comparadas:
-- RANDOM: Manda a request pra um servidor aleatório.
-- ROUND_ROBIN: Manda pra cada servidor em ordem, ciclicamente.
-- SHORTEST_QUEUE: Manda pro servidor que tiver a menor fila.
+Policies compared:
+- RANDOM: Sends the request to a random server.
+- ROUND_ROBIN: Sends to each server in order, cyclically.
+- SHORTEST_QUEUE: Sends to the server with the shortest queue.
 
-No final, ele printa uma tabela com os resultados de cada uma.
+At the end, it prints a table with the results of each one.
 """
 import simpy
 import random
 import pandas as pd
 
-# --- Configs da Simulação ---
-POLICIES_TO_TEST = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE'] # Políticas que vamos testar.
-NUM_SERVERS = 3                      # Quantidade de servidores disponíveis.
-REQUEST_ARRIVAL_RATE = 10            # Média de requests chegando por segundo.
-SIMULATION_TIME = 100                # Duração total da simulação em segundos.
+# Simulation Settings
+POLICIES_TO_TEST = ['RANDOM', 'ROUND_ROBIN', 'SHORTEST_QUEUE'] # Policies to be tested
+NUM_SERVERS = 3                                                # Number of available servers
+REQUEST_ARRIVAL_RATE = 10                                      # Average number of requests arriving per second
+SIMULATION_TIME = 100                                          # Total simulation duration in seconds
 
-# Tempo de processamento (min, max) pra cada tipo de request.
+# Processing time (min, max) for each type of request
 PROCESSING_TIMES = {
     'CPU_INTENSIVE': (1, 8),
     'IO_BOUND': (8, 15)
 }
 
 class Colors:
-    """Classe pra deixar o print no terminal colorido."""
+    """Color the terminal output."""
     RESET = '\033[0m'
     GREEN = '\033[92m'
     CYAN = '\033[96m'
@@ -37,62 +37,61 @@ class Colors:
     BLUE = '\033[94m'
 
 class Statistics:
-    """Classe que guarda e calcula as métricas da simulação."""
+    """Class that stores and calculates simulation metrics."""
     def __init__(self):
-        """Inicia os contadores."""
+        """Start the counters."""
         self.completed_requests = 0
         self.total_response_time = 0.0
 
     def record_completion(self, request):
         """
-        Atualiza as stats quando uma request termina.
-        Recebe a request que acabou de ser processada.
+        Updates the statistics when a request is completed.
         """
         self.completed_requests += 1
         response_time = request.completion_time - request.arrival_time
         self.total_response_time += response_time
 
     def calculate_throughput(self, sim_time):
-        """Calcula o throughput (requests por segundo)."""
+        """Calculates the throughput (requests/second)."""
         return self.completed_requests / sim_time if sim_time > 0 else 0
 
     def calculate_avg_response_time(self):
-        """Calcula o tempo médio de resposta das requests."""
+        """Calculates the average response time for requests."""
         return self.total_response_time / self.completed_requests if self.completed_requests > 0 else 0
 
 class Request:
-    """Representa uma request de um cliente no sistema."""
+    """Represents a customer request in the system."""
     def __init__(self, request_id, request_type, arrival_time, processing_time):
         """
-        Inicia a request com suas infos.
-        - request_id: ID único.
-        - request_type: Tipo da request (ex: 'CPU_INTENSIVE').
-        - arrival_time: Momento em que ela chegou na simulação.
-        - processing_time: Tempo que ela leva pra ser processada.
+        Start a request with its respective characteristics:
+        - request_id: Unique ID.
+        - request_type: Type of request (ex: 'CPU_INTENSIVE').
+        - arrival_time: The moment the reqeuest arrived in the simulation.
+        - processing_time: How long it took to be processed.
         """
         self.id = request_id
         self.type = request_type
         self.arrival_time = arrival_time
         self.processing_time = processing_time
-        self.completion_time = 0 # Vai ser preenchido quando ela terminar.
+        self.completion_time = 0               # It will be modified when the request is completed
 
 class Server:
-    """Representa um servidor que processa uma request por vez."""
+    """Represents a server that processes one request at a time."""
     def __init__(self, env, server_id, show_logs=True):
         """
-        Inicia um Servidor.
-        - env: Ambiente do SimPy.
-        - server_id: ID único do servidor.
+        Start a Server.
+        - env: SimPy environment.
+        - server_id: Unique ID.
         """
         self.env = env
         self.id = server_id
         self.processor = simpy.Resource(env, capacity=1)
-        self.queue_len = 0 # Tamanho da fila (contando a request em processamento).
+        self.queue_len = 0                     # Queue size (including the request being processed).
         self.show_logs = show_logs
 
     def process_request(self, request):
-        """Simula o tempo que leva pra processar a request."""
-        # Pausa a execução pelo tempo de processamento da request.
+        """Simulates the time it takes to process the request."""
+        # Pause execution for the duration of the request processing time
         yield self.env.timeout(request.processing_time)
         request.completion_time = self.env.now
         if self.show_logs:
@@ -100,25 +99,25 @@ class Server:
                   f"Response Time: {request.completion_time - request.arrival_time:.4f}{Colors.RESET}")
 
 class LoadBalancer:
-    """Distribui as requests que chegam para os servidores."""
+    """Distributes incoming requests to the servers."""
     def __init__(self, env, servers, stats, policy='ROUND_ROBIN', show_logs=True):
         """
-        Inicia o LoadBalancer.
-        - env: Ambiente do SimPy.
-        - servers: Lista com os objetos de servidores.
-        - stats: Objeto de estatísticas pra gravar os resultados.
-        - policy: Política de balanceamento a ser usada.
+        Start the LoadBalancer.
+        - env: SimPy environment.
+        - servers: List of server objects.
+        - stats: Statistics object for recording results..
+        - policy: Balancing policy to be used.
         """
         self.env = env
         self.servers = servers
         self.stats = stats
         self.policy = policy
-        self.rr_counter = 0 # Contador pro Round Robin.
+        self.rr_counter = 0        # Counter for Round Robin.
         self.show_logs = show_logs
 
     def handle_request(self, request):
-        """Escolhe um servidor com base na política e manda a request pra ele."""
-        # Escolhe o servidor de acordo com a política.
+        """Choose a server based on the policy and send the request to it."""
+        # Choose a server based on the policy
         if self.policy == 'RANDOM':
             selected_server = random.choice(self.servers)
         elif self.policy == 'ROUND_ROBIN':
@@ -132,49 +131,49 @@ class LoadBalancer:
         else:
             raise ValueError(f"Política desconhecida: {self.policy}")
 
-        # Aumenta o contador da fila e inicia o processo do servidor.
+        # Increase the queue counter and start the server process
         selected_server.queue_len += 1
         if self.show_logs:
-            print(f"{Colors.BLUE}[Time: {self.env.now:.4f}] Load Balancer: Request {request.id} enviado para o Server {selected_server.id}. "
-                  f"Tamanho da fila: {selected_server.queue_len}{Colors.RESET}")
+            print(f"{Colors.BLUE}[Time: {self.env.now:.4f}] Load Balancer: Request {request.id} sent to the Server {selected_server.id}. "
+                  f"Queue length: {selected_server.queue_len}{Colors.RESET}")
 
         self.env.process(self.server_worker(selected_server, request))
 
     def server_worker(self, server, request):
         """
-        Processo do SimPy que cuida do ciclo de vida da request no servidor.
-        Ele espera o servidor ficar livre, processa a request e depois salva os resultados.
+        SimPy process that manages the request lifecycle on the server.
+        It waits for the server to become available, processes the request, and then saves the results.
         """
         with server.processor.request() as req:
-            # Espera o servidor ficar disponível.
+            # Waits until the server becomes available
             yield req
             try:
-                # Executa o processo
+                # Execute the process
                 yield self.env.process(server.process_request(request))
                 self.stats.record_completion(request)
             finally:
-                # Somente remove da fila quando o processo termina de ser executado
-                # Assim, queue_len >= 1 implica em servidor ocupado
+                # It only removes from the queue when the process is completed
+                # Consequently, queue_len >= 1 implies that the server is occupied
                 server.queue_len -= 1
-                # sanity
+                # Sanity check
                 if server.queue_len < 0:
                     server.queue_len = 0
 
 def pre_generate_requests(sim_time, request_arrival_rate):
     """
-    Cria a lista de requests ANTES da simulação começar.
-    Isso garante que todas as políticas usem a mesma lista, pra comparação ser justa.
+    Creates the request list before the simulation starts.
+    This ensures that all policies use the same list, for a fair comparison.
     """
     requests = []
     current_time = 0.0
-    # Gera requests até o tempo final da simulação.
+    # Generates requests until the final simulation time.
     while current_time < sim_time:
-        # Calcula quando a próxima request vai chegar.
+        # Calculates when the next request will arrive.
         inter_arrival_time = random.expovariate(request_arrival_rate)
         current_time += inter_arrival_time
         
         if current_time < sim_time:
-            # Sorteia o tipo e o tempo de processamento da request.
+            # Randomly selects the type and processing time of the request.
             req_type = random.choice(list(PROCESSING_TIMES.keys()))
             min_proc, max_proc = PROCESSING_TIMES[req_type]
             processing_time = random.uniform(min_proc, max_proc)
@@ -188,68 +187,68 @@ def pre_generate_requests(sim_time, request_arrival_rate):
 
 def request_injector(env, load_balancer, pre_generated_requests, show_logs=True):
     """
-    Processo do SimPy que vai 'injetando' as requests da lista na simulação.
-    Ele lê a lista e espera o tempo certo pra criar e enviar a request pro LB.
+    SimPy process that 'injects' requests from the list into the simulation.
+    It reads the list and waits for the correct time to create and send the request to the LB.
     """
     for i, req_info in enumerate(pre_generated_requests):
-        # Espera até o tempo de chegada da request.
+        # Waits until the request arrival time.
         yield env.timeout(max(0, req_info['arrival_time'] - env.now))
         
-        # Cria o objeto da Request.
+        # Creates the Request object.
         req = Request(
             request_id=i, 
             request_type=req_info['type'],
             arrival_time=env.now,
             processing_time=req_info['processing_time']
         )
-        if show_logs: print(f"{Colors.CYAN}[Time: {env.now:.4f}] Generator: Novo request {req.type} com ID {req.id} foi gerado.{Colors.RESET}")
-        # Entrega a request pro load balancer.
+        if show_logs: print(f"{Colors.CYAN}[Time: {env.now:.4f}] Generator: New request {req.type} with ID {req.id} was generated.{Colors.RESET}")
+        # Delivers the request to the load balancer.
         load_balancer.handle_request(req)
 
 def run_single_simulation(policy, num_servers, sim_time, pre_generated_requests, show_logs=True):
     """
-    Configura e roda a simulação completa pra UMA política específica.
-    Retorna o tempo médio de resposta e o throughput.
+    Configures and runs the full simulation for one specific policy.
+    Returns the average response time and throughput.
     """
     if show_logs:
-        print(f"{Colors.BOLD}--- Rodando simulação para a política '{policy}' ---{Colors.RESET}")
+        print(f"{Colors.BOLD}--- Running the simulation with the policy '{policy}' ---{Colors.RESET}")
     
-    # Prepara o ambiente da simulação.
+    # Prepares the simulation environment.
     stats = Statistics()
     env = simpy.Environment()
     servers = [Server(env, i, show_logs=show_logs) for i in range(num_servers)]
     load_balancer = LoadBalancer(env, servers, stats, policy=policy, show_logs=show_logs)
     
-    # Inicia o processo que injeta as requests.
+    # Starts the process that injects the requests.
     env.process(request_injector(env, load_balancer, pre_generated_requests, show_logs=show_logs))
     
-    # Roda a simulação.
+    # Runs the simulation.
     env.run(until=sim_time) 
     
-    # Calcula os resultados finais.
+    # Calculates the final results.
     throughput = stats.calculate_throughput(sim_time)
     avg_response_time = stats.calculate_avg_response_time()
 
     if show_logs:
-        print(f"Finalizado. Tempo Médio: {avg_response_time:.4f}, Throughput: {throughput:.4f}")
+        print(f"Completed. Average Response Time: {avg_response_time:.4f}, Throughput: {throughput:.4f}")
 
     return avg_response_time, throughput
 
 if __name__ == "__main__":
-    # Define uma seed pro random pra garantir que os resultados sejam sempre os mesmos.
-    # Assim, a lista de requests gerada vai ser sempre idêntica.
+    # Sets a seed for random to ensure results are always the same.
+    # It ensures that the generated request list will always be identical.
     random.seed(42) 
     
-    print("Gerando lista de requests para a simulação...")
+    print("Generating the requests list for the simulation...")
     master_request_list = pre_generate_requests(SIMULATION_TIME, REQUEST_ARRIVAL_RATE)
-    print(f"{len(master_request_list)} requests geradas.")
+    print(f"{len(master_request_list)} requests were generated.")
 
     all_results = []
     
-    # Roda uma simulação para cada política da lista.
+    # Runs a simulation for each policy in the list
     for policy in POLICIES_TO_TEST:
-        # Resetar a seed aqui garante que a política 'RANDOM' se comporte igual
-        # toda vez que rodamos o script, pra ajudar na reprodutibilidade.
+        # Resetting the seed here ensures the 'RANDOM' policy behaves the same way
+        # every time we run the script, which ensures reproducibility.
         random.seed(42) 
         
         avg_time, throughput = run_single_simulation(
@@ -259,12 +258,12 @@ if __name__ == "__main__":
             pre_generated_requests=master_request_list,
             show_logs=True
         )
-        # Guarda o resultado pra mostrar no final.
+        # Saves the result to show at the end.
         all_results.append({'Policy': policy, 'Avg Response Time (s)': avg_time, 'Throughput (req/s)': throughput})
 
-    # Usa pandas pra printar a tabela de resultados bonitinha.
+    # Uses pandas to print the results table.
     results_df = pd.DataFrame(all_results)
     
-    # Mostra a tabela final comparando tudo.
-    print(f"\n{Colors.BOLD}{Colors.GREEN}--- Resultados Finais Comparativos ---{Colors.RESET}")
+    # Shows the final table comparing the results.
+    print(f"\n{Colors.BOLD}{Colors.GREEN}--- Final Results ---{Colors.RESET}")
     print(results_df.to_string(index=False))

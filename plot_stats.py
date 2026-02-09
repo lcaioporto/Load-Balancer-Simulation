@@ -12,7 +12,7 @@ OUTPUT_DIR = 'stats'
 
 def run_experiment():
     """
-    Executa simulações para cada política em todas as taxas de chegada
+    It runs simulations for each policy across all arrival rates.
     """
     results = {p: {'avg_response_times': [], 'throughputs': []} for p in POLICIES}
 
@@ -43,7 +43,7 @@ def run_experiment():
 
 def plot_and_save_results(results):
     """
-    Gera e salva gráficos, incluindo as métricas de área sob a curva.
+    Generates and saves graphs, including area under the curve metrics.
     """
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
@@ -54,14 +54,14 @@ def plot_and_save_results(results):
     # --- Plot 1: Average Response Time ---
     fig1, ax1 = plt.subplots(figsize=(12, 7))
 
-    # Para tempo de resposta, uma área menor é melhor.
+    # For response time, a smaller area is better
     areas = {p: np.trapezoid(results[p]['avg_response_times'], ARRIVAL_RATES) for p in POLICIES}
-    # Encontre a política com a área mínima (melhor desempenho)
+    # Find the policy with the minimum area (best performance)
     min_area = min(areas.values())
 
     for policy in POLICIES:
         area = areas[policy]
-        # Desempenho em relação à melhor política (quanto menor, melhor)
+        # Performance relative to the best policy (the lower the better)
         rel_perf = area / min_area if min_area > 0 else 0
         label_text = f'{policy} (Best Perf. Ratio: {rel_perf:.2f})'
         ax1.plot(ARRIVAL_RATES, results[policy]['avg_response_times'], marker='o', linestyle='-', label=label_text)
@@ -79,14 +79,14 @@ def plot_and_save_results(results):
     # --- Plot 2: Throughput ---
     fig2, ax2 = plt.subplots(figsize=(12, 7))
     
-    # Para throughput, uma área maior é melhor
+    # For throughput, a larger area is better
     areas = {p: np.trapezoid(results[p]['throughputs'], ARRIVAL_RATES) for p in POLICIES}
-    # Encontre a política com a área máxima (melhor desempenho)
+    # Find the policy with the maximum area (best performance)
     max_area = max(areas.values())
 
     for policy in POLICIES:
         area = areas[policy]
-        # Desempenho em relação à melhor política (quanto maior, melhor)
+        # Performance relative to best policy (the higher, the better)
         rel_perf = area / max_area if max_area > 0 else 0
         label_text = f'{policy} (Best Perf. Ratio: {rel_perf:.2f})'
         ax2.plot(ARRIVAL_RATES, results[policy]['throughputs'], marker='s', linestyle='--', label=label_text)
